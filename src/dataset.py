@@ -5,7 +5,11 @@ import matplotlib.pyplot as plt
 import torch
 import os
 import cv2
+
 from PIL import Image
+from torch.utils.data import dataloader
+from torchvision import transforms
+from tqdm import tqdm
 
 class Transpose(object):
     """
@@ -36,18 +40,14 @@ class Resize(object):
     def __call__(self, img):
         return cv2.resize(img, self.size)
 
-def train_test_split(metadata_root, val_size):
-    df = pd.read_csv(metadata_root)
-    val_index = np.random.choice(np.arange(0, df.shape[0]), int(val_size*df.shape[0]), replace=False)
-    df_train = df.iloc[df.index.isin(val_index) == False, :]
-    df_val = df.iloc[val_index, :]
-    return df_train, df_val
-
-
 class SteelDataset(object):
-    def __init__(self, metadata_root, image_root,
-                 shape=(256, 1600, 3), colors=None,
-                 transform=None, mask_transform = None):
+    def __init__(self,
+                 metadata_root,
+                 image_root,
+                 shape=(256, 1600, 3),
+                 colors=None,
+                 transform=None,
+                 mask_transform = None):
 
         self.metadata_root = metadata_root
         self.image_root = image_root
@@ -68,7 +68,9 @@ class SteelDataset(object):
             self.colors = [steelblue, orange, green, red]
 
     def get_image(self, idx):
-        path = '{}/{}'.format(self.image_root, self.metadata.ImageId[idx])
+        path = '{}/{}/{}'.format(self.image_root,
+                                 self.metadata.Folder[idx],
+                                 self.metadata.ImageId[idx])
         # img = cv2.imread(path)
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = Image.open(path)
@@ -125,7 +127,33 @@ class SteelDataset(object):
     def __len__(self):
         return self.metadata.shape[0]
 
+class SteelMatrix():
+    def __init__(self, SteelDataset, batch_size, n_workers=4):
+        self.metadata = SteelDataset.metadata
+        self.shape = SteelDataset.shape
+        self.data = dataloader.DataLoader(SteelDataset, batch_size, num_workers=n_workers)
 
+    def get_matrix(self, tqdm_disable=False, return_mask = False):
+        X, M, y = torch.Tensor(), torch.Tensor().long(), torch.Tensor().long()
+
+        for batch in tqdm(self.data):
+            imgs, masks, labels = batch[0], batch[1]['mask'].long(), batch[1]['label']
+            if return_mask:
+                X, M, y = torch.cat([X, imgs]), torch.cat([M, masks]).long(), torch.cat([y, labels]).long()
+            else:
+                X, y = torch.cat([X, imgs]), torch.cat([y, labels]).long()
+
+        if return_mask:
+            return X, M, y
+        return X, y
+
+    def get_masks(self, tqdm_disable=False):
+        M = torch.Tensor().long()
+
+        for batch in tqdm(self.data):
+            masks  = batch[1]['mask'].long()
+            M  = torch.cat([M, masks]).long()
+        return M
 
 if __name__ == '__main__':
     dataset = SteelDataset(metadata_root='../data/train.csv', image_root='../data/train_images')
