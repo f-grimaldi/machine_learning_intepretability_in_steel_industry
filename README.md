@@ -12,12 +12,9 @@
 
 - Pretrained VGG16 with BN
 - Pretrained VGG19 with BN
-- Pretrained VGG16
-- Pretrained VGG19
-- VGG16 with BN
-- VGG19 with BN
-- VGG16
-- VGG19
+- SqueezeNet 1.1
+- InceptionV3
+- AdHoc CNN
 
 ### 3. Model evaluation
 
