@@ -68,9 +68,8 @@ class SteelDataset(object):
             self.colors = [steelblue, orange, green, red]
 
     def get_image(self, idx):
-        path = '{}/{}/{}'.format(self.image_root,
-                                 self.metadata.Folder[idx],
-                                 self.metadata.ImageId[idx])
+        path = '{}/{}'.format(self.image_root,
+                              self.metadata.ImageId[idx])
         # img = cv2.imread(path)
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = Image.open(path)
