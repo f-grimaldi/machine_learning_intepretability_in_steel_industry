@@ -56,6 +56,8 @@ def get_argparse():
 
 def get_model(args, device):
     net = models.squeezenet1_1(pretrained=True)
+    net.features = net.features[:10]
+    net.classifier[1] = nn.Conv2d(384, 1000, kernel_size = (1, 1), stride = (1, 1))
     net.classifier = nn.Sequential(*net.classifier, nn.Flatten(),
                                    nn.Linear(1000, args.n_output))
     print(net)
@@ -172,22 +174,22 @@ def main():
 
     ### Evaluate model
 
-    # fig, ax = plt.subplots(1, 2, figsize=(20, 5))
-    # ax[0].plot(train_loss_curve, label='Train Loss')
-    # ax[0].plot(valid_loss_curve, label='Validation Loss')
-    # ax[0].legend()
-    # ax[0].grid()
-    # ax[0].set_title('Loss curve')
-    # ax[0].set_xlabel('Epoch')
-    # ax[0].set_ylabel('Loss')
-    # ax[1].plot(train_accuracy, label='Train Accuracy')
-    # ax[1].plot(valid_accuracy, label='Validation Accuracy')
-    # ax[1].legend()
-    # ax[1].grid()
-    # ax[1].set_title('Accuracy curve')
-    # ax[1].set_xlabel('Epoch')
-    # ax[1].set_ylabel('Accuracy')
-    # plt.show()
+    fig, ax = plt.subplots(1, 2, figsize=(20, 5))
+    ax[0].plot(train_loss_curve, label='Train Loss')
+    ax[0].plot(valid_loss_curve, label='Validation Loss')
+    ax[0].legend()
+    ax[0].grid()
+    ax[0].set_title('Loss curve')
+    ax[0].set_xlabel('Epoch')
+    ax[0].set_ylabel('Loss')
+    ax[1].plot(train_accuracy, label='Train Accuracy')
+    ax[1].plot(valid_accuracy, label='Validation Accuracy')
+    ax[1].legend()
+    ax[1].grid()
+    ax[1].set_title('Accuracy curve')
+    ax[1].set_xlabel('Epoch')
+    ax[1].set_ylabel('Accuracy')
+    plt.show()
     #
     # y_pred = []
     # y_true = []
