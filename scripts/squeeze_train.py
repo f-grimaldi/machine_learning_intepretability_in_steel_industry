@@ -37,10 +37,6 @@ def get_argparse():
                         action = 'store_true')
     parser.add_argument('--n_output',
                         type=int,            default=2)
-    parser.add_argument('--n_neurons',
-                        type=int,            default=32)
-    parser.add_argument('--dropout',
-                        type=float,          default=0.3)
     parser.add_argument('--batch_size',
                         type=int,            default=10)
     parser.add_argument('--lr',
@@ -51,7 +47,8 @@ def get_argparse():
                         type=int,            default=60)
     parser.add_argument('--noise_coeff',
                         type=float,          default=0.15)
-
+    parser.add_argument('--weight_loss',
+                        action='store_true')
     parser.add_argument('--save_last',
                         action='store_true')
     args = parser.parse_args()
@@ -59,11 +56,9 @@ def get_argparse():
 
 def get_model(args, device):
     net = models.squeezenet1_1(pretrained=True)
-    net.classifer = nn.Sequential(*net.classifier, nn.Flatten(),
-                                  nn.Linear(1000, args.n_neurons),
-                                  nn.ReLU(),
-                                  nn.Dropout(p=args.dropout),
-                                  nn.Linear(args.n_neurons, args.n_output))
+    net.classifier = nn.Sequential(*net.classifier, nn.Flatten(),
+                                   nn.Linear(1000, args.n_output))
+    print(net)
     net = net.to(device)
     return net
 
@@ -93,7 +88,11 @@ def main():
 
     ### Train model
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
-    loss_fn = nn.CrossEntropyLoss()
+    if args.weight_loss:
+        w = [1/y_val[y_val == i].shape[0] for i in range(args.n_output)]
+        loss_fn = nn.CrossEntropyLoss(torch.tensor(w).to(device))
+    else:
+        loss_fn = nn.CrossEntropyLoss()
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.2)
 
     train_loss_curve, valid_loss_curve = [], []
@@ -139,7 +138,7 @@ def main():
                 y_pred = np.argmax(out.detach().cpu().numpy(), axis=1)
                 batch_valid_loss.append(float(loss))
                 batch_valid_acc.append(float(accuracy_score(y.cpu().numpy(), y_pred)))
-                batch_valid_f1.append(float(f1_score(y.cpu().numpy(), y_pred, average='macro')))
+                batch_valid_f1.append(float(f1_score(y.cpu().numpy(), y_pred, average='weighted')))
 
         lr_scheduler.step()
 
@@ -173,75 +172,75 @@ def main():
 
     ### Evaluate model
 
-    fig, ax = plt.subplots(1, 2, figsize=(20, 5))
-    ax[0].plot(train_loss_curve, label='Train Loss')
-    ax[0].plot(valid_loss_curve, label='Validation Loss')
-    ax[0].legend()
-    ax[0].grid()
-    ax[0].set_title('Loss curve')
-    ax[0].set_xlabel('Epoch')
-    ax[0].set_ylabel('Loss')
-    ax[1].plot(train_accuracy, label='Train Accuracy')
-    ax[1].plot(valid_accuracy, label='Validation Accuracy')
-    ax[1].legend()
-    ax[1].grid()
-    ax[1].set_title('Accuracy curve')
-    ax[1].set_xlabel('Epoch')
-    ax[1].set_ylabel('Accuracy')
-    plt.show()
-
-    y_pred = []
-    y_true = []
-    y_score = []
-    batch_size = 10
-    with torch.no_grad():
-        net.eval()
-        for n in tqdm(range(X_val.shape[0]//batch_size)):
-            X, y = X_val[n*batch_size:(n+1)*batch_size].to(device), y_val[n*batch_size:(n+1)*batch_size].to(device).long()
-            out = net(X)
-            y_score = np.concatenate([y_score, nn.Softmax(dim=1)(out).detach().cpu().numpy().reshape(-1)])
-            y_pred = np.concatenate([y_pred, np.argmax(out.detach().cpu().numpy(), axis=1)])
-            y_true = np.concatenate([y_true, y.cpu().numpy()])
-
-    tpr, fpr, threshold = roc_curve(y_true, y_score)
-    auc_score = auc(fpr, tpr)
-    print('METRICS WITH 0.5 AS THRESHOLD')
-    print('-----------------------------')
-    print('Accuracy:\t{:.4f}'.format(accuracy_score(y_true, y_pred)))
-    print('F1 Score:\t{:.4f}'.format(f1_score(y_true, y_pred, average='macro')))
-    print('AUC Score:\t{:.4f}'.format(auc_score))
-
-
-
-    best_treshold = np.argmax([get_treshold(t=i)[1] for i in np.arange(0, 1, step=0.05)])*0.05
-    y_pred_best = get_treshold(t=best_treshold)[0]
-
-    accuracy = accuracy_score(y_true, y_pred_best)
-    f1 = f1_score(y_true, y_pred_best, average='macro')
-    print('METRICS WITH {:.2f} THRESHOLD'.format(best_treshold))
-    print('-----------------------------')
-    print('Accuracy:\t{:.4f}'.format(accuracy))
-    print('F1 Score:\t{:.4f}'.format(f1))
-    print('AUC Score:\t{:.4f}'.format(auc_score))
-
-    ax[0].plot(fpr, tpr, label='AUC = {:.3f}'.format(auc_score))
-    ax[0].grid()
-    ax[0].legend()
-    ax[0].set_title('ROC Curve')
-
-    cm = confusion_matrix(y_pred_best, y_true)
-    cm_plot = ax[1].matshow(cm, cmap='Blues_r')
-    ax[1].set_title('Confusion Matrix')
-    ax[1].set_xlabel('True')
-    ax[1].set_ylabel('Predicted')
-    ax[1].xaxis.set_ticks_position('bottom')
-    plt.colorbar(cm_plot)
-    ax[1].set_xticklabels(['No Defects', 'No Defects', 'Defects'])
-    ax[1].set_yticklabels(['No Defects', 'No Defects', 'Defects'])
-    for i in range(2):
-        for j in range(2):
-            k = 0
-            ax[1].text(j, i, cm[i, j], va='center', ha='center')
+    # fig, ax = plt.subplots(1, 2, figsize=(20, 5))
+    # ax[0].plot(train_loss_curve, label='Train Loss')
+    # ax[0].plot(valid_loss_curve, label='Validation Loss')
+    # ax[0].legend()
+    # ax[0].grid()
+    # ax[0].set_title('Loss curve')
+    # ax[0].set_xlabel('Epoch')
+    # ax[0].set_ylabel('Loss')
+    # ax[1].plot(train_accuracy, label='Train Accuracy')
+    # ax[1].plot(valid_accuracy, label='Validation Accuracy')
+    # ax[1].legend()
+    # ax[1].grid()
+    # ax[1].set_title('Accuracy curve')
+    # ax[1].set_xlabel('Epoch')
+    # ax[1].set_ylabel('Accuracy')
+    # plt.show()
+    #
+    # y_pred = []
+    # y_true = []
+    # y_score = []
+    # batch_size = 10
+    # with torch.no_grad():
+    #     net.eval()
+    #     for n in tqdm(range(X_val.shape[0]//batch_size)):
+    #         X, y = X_val[n*batch_size:(n+1)*batch_size].to(device), y_val[n*batch_size:(n+1)*batch_size].to(device).long()
+    #         out = net(X)
+    #         y_score = np.concatenate([y_score, nn.Softmax(dim=1)(out).detach().cpu().numpy().reshape(-1)])
+    #         y_pred = np.concatenate([y_pred, np.argmax(out.detach().cpu().numpy(), axis=1)])
+    #         y_true = np.concatenate([y_true, y.cpu().numpy()])
+    #
+    # tpr, fpr, threshold = roc_curve(y_true, y_score)
+    # auc_score = auc(fpr, tpr)
+    # print('METRICS WITH 0.5 AS THRESHOLD')
+    # print('-----------------------------')
+    # print('Accuracy:\t{:.4f}'.format(accuracy_score(y_true, y_pred)))
+    # print('F1 Score:\t{:.4f}'.format(f1_score(y_true, y_pred, average='macro')))
+    # print('AUC Score:\t{:.4f}'.format(auc_score))
+    #
+    #
+    #
+    # best_treshold = np.argmax([get_treshold(t=i)[1] for i in np.arange(0, 1, step=0.05)])*0.05
+    # y_pred_best = get_treshold(t=best_treshold)[0]
+    #
+    # accuracy = accuracy_score(y_true, y_pred_best)
+    # f1 = f1_score(y_true, y_pred_best, average='macro')
+    # print('METRICS WITH {:.2f} THRESHOLD'.format(best_treshold))
+    # print('-----------------------------')
+    # print('Accuracy:\t{:.4f}'.format(accuracy))
+    # print('F1 Score:\t{:.4f}'.format(f1))
+    # print('AUC Score:\t{:.4f}'.format(auc_score))
+    #
+    # ax[0].plot(fpr, tpr, label='AUC = {:.3f}'.format(auc_score))
+    # ax[0].grid()
+    # ax[0].legend()
+    # ax[0].set_title('ROC Curve')
+    #
+    # cm = confusion_matrix(y_pred_best, y_true)
+    # cm_plot = ax[1].matshow(cm, cmap='Blues_r')
+    # ax[1].set_title('Confusion Matrix')
+    # ax[1].set_xlabel('True')
+    # ax[1].set_ylabel('Predicted')
+    # ax[1].xaxis.set_ticks_position('bottom')
+    # plt.colorbar(cm_plot)
+    # ax[1].set_xticklabels(['No Defects', 'No Defects', 'Defects'])
+    # ax[1].set_yticklabels(['No Defects', 'No Defects', 'Defects'])
+    # for i in range(n_output):
+    #     for j in range(n_output):
+    #         k = 0
+    #         ax[1].text(j, i, cm[i, j], va='center', ha='center')
 
 if __name__ == '__main__':
     main()
