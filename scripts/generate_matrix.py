@@ -3,7 +3,7 @@ import os
 sys.path.append('\\'.join(os.getcwd().split('\\')[:-1])+'\\src')
 import dataset
 from dataset import SteelDataset, SteelMatrix, Transpose, Resize
-from utils import get_default_params, train_val_test_split
+from utils import get_default_params, train_val_test_split, create_data, get_transforms
 
 import numpy as np
 
@@ -49,30 +49,6 @@ def get_argparse():
 
     args = parser.parse_args()
     return args
-
-
-def get_transform(size, mean, std):
-    img_transform = transforms.Compose([transforms.Resize(size = size), transforms.ToTensor(),
-                                      transforms.Normalize(mean = mean, std = std)])
-    mask_transform = transforms.Compose([dataset.Resize(size = (size[1], size[0]))])
-    return img_transform, mask_transform
-
-def create_data(images_path, metadata_path,
-                batch_size=1000, num_workers= 0,
-                return_mask=True, params=None):
-    if not params:
-        params = get_default_params()
-        print('Loading default params:\n{}'.format(params))
-    img_t, mask_t = get_transform(params['size'], params['mean'], params['std'])
-    data = dataset.SteelDataset(metadata_root= metadata_path,
-                                image_root = images_path,
-                                transform = img_t,
-                                mask_transform = mask_t)
-    matrix_generator = dataset.SteelMatrix(SteelDataset=data,
-                                           batch_size=batch_size,
-                                           n_workers=num_workers)
-    X, M, y = matrix_generator.get_matrix(return_mask = return_mask)
-    return X, y, M
 
 
 def main():
