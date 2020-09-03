@@ -17,7 +17,7 @@ from torch import nn, optim
 from torch.utils.data import dataloader
 from torchvision import transforms, models
 from sklearn.metrics import accuracy_score, auc, confusion_matrix, roc_curve, f1_score
-
+from sklearn.utils import shuffle
 
 def get_argparse():
     # 1. Set argument
@@ -25,18 +25,23 @@ def get_argparse():
     # 1.a) General args
     parser.add_argument('--model_output_path', type=str)
     parser.add_argument('--train_input_path',
-                        type=str,            default='../data/binaryData/X_train_binary.pth')
+                        type=str,            default='../data/multiData/X_train.pth')
     parser.add_argument('--train_label_path',
-                        type=str,            default='../data/binaryData/y_train_binary.pth')
+                        type=str,            default='../data/multiData/y_train.pth')
+    parser.add_argument('--train_augmented_input_path',
+                        type=str,            default='../data/multiData/X_train_aug.pth')
+    parser.add_argument('--train_augmented_label_path',
+                        type=str,            default='../data/multiData/y_train_aug.pth')
     parser.add_argument('--val_input_path',
-                        type=str,            default='../data/binaryData/X_val_binary.pth')
+                        type=str,            default='../data/multiData/X_val.pth')
     parser.add_argument('--val_label_path',
-                        type=str,            default='../data/binaryData/y_val_binary.pth')
-
+                        type=str,            default='../data/multiData/y_val.pth')
+    parser.add_argument('--use_augmentation',
+                        action='store_true')
     parser.add_argument('--cpu',
                         action = 'store_true')
     parser.add_argument('--n_output',
-                        type=int,            default=2)
+                        type=int,            default=5)
     parser.add_argument('--batch_size',
                         type=int,            default=10)
     parser.add_argument('--lr',
@@ -51,13 +56,16 @@ def get_argparse():
                         action='store_true')
     parser.add_argument('--save_last',
                         action='store_true')
+    parser.add_argument('--reduced',
+                        type='int',          default=-1)
     args = parser.parse_args()
     return args
 
 def get_model(args, device):
     net = models.squeezenet1_1(pretrained=True)
-    net.features = net.features[:10]
-    net.classifier[1] = nn.Conv2d(384, 1000, kernel_size = (1, 1), stride = (1, 1))
+    if args.reduced > 0:
+        net.features = net.features[:args.reduced]
+        net.classifier[1] = nn.Conv2d(384, 1000, kernel_size = (1, 1), stride = (1, 1))
     net.classifier = nn.Sequential(*net.classifier, nn.Flatten(),
                                    nn.Linear(1000, args.n_output))
     print(net)
@@ -81,8 +89,17 @@ def main():
     print('Arguments:\n{}'.format(args))
     print('Parameters:\n{}'.format(params))
 
+    torch.save(torch.tensor([1]), args.model_output_path)
     ### Load data
     X_train, y_train= torch.load(args.train_input_path), torch.load(args.train_label_path)
+    if args.use_augmentation:
+        print('Using augmentation for under represented class:')
+        X_train_aug = torch.load(args.train_augmented_input_path)
+        y_train_aug = torch.load(args.train_augmented_label_path)
+        X_train = torch.cat([X_train, X_train_aug])
+        y_train = torch.cat([y_train, y_train_aug])
+        X_train, y_train = shuffle(X_train, y_train)
+        print('\tAdded {} new examples'.format(X_train_aug.shape[0]))
     X_val, y_val = torch.load(args.val_input_path), torch.load(args.val_label_path)
 
     ### Load model
