@@ -138,11 +138,13 @@ dmypy.json
 cython_debug/
 
 # Ignore
-data/*
+#data/**
+data/binaryData/*
+data/multiData/*
 
 # Allow
-!data/train_images/
-!data/data.csv
+#!data/train_images/
+#!data/data.csv
 !data/binaryData/binary_task_data.csv
 !data/binaryData/train_data.csv
 !data/binaryData/val_data.csv

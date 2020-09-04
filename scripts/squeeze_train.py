@@ -181,7 +181,7 @@ def main():
     else:
         loss_fn = nn.CrossEntropyLoss()
     ### 4.c Set scheduler
-    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.2)
+    #lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.2)
 
     ### 4.d Init training variables
     train_loss_curve, valid_loss_curve = [], []
@@ -232,7 +232,7 @@ def main():
                 batch_valid_acc.append(float(accuracy_score(y.cpu().numpy(), y_pred)))
                 batch_valid_f1.append(float(f1_score(y.cpu().numpy(), y_pred, average='weighted')))
 
-        lr_scheduler.step()
+        #lr_scheduler.step()
 
         ### Check results
         train_loss_curve.append(np.mean(batch_train_loss))
