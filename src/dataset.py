@@ -10,6 +10,12 @@ from PIL import Image
 from torch.utils.data import dataloader
 from torchvision import transforms
 from tqdm import tqdm
+from albumentations import (
+    VerticalFlip, HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose
+)
 
 class Transpose(object):
     """
@@ -126,6 +132,9 @@ class SteelDataset(object):
     def __len__(self):
         return self.metadata.shape[0]
 
+"""
+Get all the batches using the SteelDataset and put them into one single huge matrix
+"""
 class SteelMatrix():
     def __init__(self, SteelDataset, batch_size, n_workers=4):
         self.metadata = SteelDataset.metadata
@@ -154,14 +163,65 @@ class SteelMatrix():
             M  = torch.cat([M, masks]).long()
         return M
 
-if __name__ == '__main__':
-    dataset = SteelDataset(metadata_root='../data/train.csv', image_root='../data/train_images')
-    X, y = dataset.__getitem__(0)
-    fig, ax = plt.subplots(3, 1, figsize=(20, 12))
-    ax[0].set_title('Original image: {}'.format(dataset.metadata.iloc[0, 0]))
-    ax[0].imshow(X)
-    ax[1].set_title('Masked image')
-    ax[1].imshow(dataset.get_masked_img(0))
-    ax[2].set_title('Mask')
-    ax[2].imshow(y['mask'])
-    plt.show()
+
+"""
+Take the matrix generated using SteelMatrix and divide each image in 6 parts
+"""
+class SlidingWindow():
+
+    def __init__(self, X, y, M):
+        self.X, self.y, self.M = X, y, M
+
+    def __len__(self):
+        return self.y.shape[0]
+
+    def __getitem__(self, idx):
+
+        X, y, M = torch.Tensor([]), [], torch.Tensor([]).long()
+
+        for i in range(6):
+            #print(self.X[idx, :, i*64:(i+1)*64].shape)
+            X = torch.cat([X, self.X[idx, :, :, i*64:(i+1)*64].view(1, 3, 64, 64)])
+            M = torch.cat([M, self.M[idx, :, i*64:(i+1)*64].view(1, 64, 64)])
+            if self.M[idx, :, i*64:(i+1)*64].sum() == 0:
+                y.append(0)
+            else:
+                y.append(self.y[idx])
+
+        return X, torch.tensor(y), M
+
+"""
+Augment the under represent class (target_classes = [1, 2, 4]) n_times
+(times_to_augment = [1, 1, 1]) by using HorizontalFlip and VerticalFlip
+with probability p (p = 1/sqrt(2)).
+"""
+class Augmentator(object):
+    def __init__(self, target_classes = [1,2,4],
+                 times_to_augment = [1, 1, 1],
+                 p = 1/(2**0.5), augmentations=None):
+        self.target_classes = target_classes
+        self.times_to_augment = times_to_augment
+        self.compose = self.get_augmentations(augmentations, p)
+
+    def get_augmentations(self, augmentations, p):
+        if augmentations:
+            return augmentations
+        else:
+            return Compose([HorizontalFlip(p=p), VerticalFlip(p=p)])
+
+    def __call__(self, X, y, M):
+        aug_X, aug_M, aug_y = torch.Tensor([]), torch.tensor([]).long(), []
+        for c, t in zip(self.target_classes, self.times_to_augment):
+            tmp_X = X[y==c]
+            tmp_M = M[y==c]
+            for i in range(t):
+                for sample, sample_mask in tqdm(zip(tmp_X, tmp_M)):
+                    image, mask = np.transpose(sample.numpy(), (1, 2, 0)), sample_mask.numpy()
+                    data = {"image": image, 'mask': mask}
+                    augmented = self.compose(**data)
+                    image_tensor = torch.tensor(np.transpose(augmented['image'], (2, 0, 1)))
+                    mask_tensor = torch.tensor(augmented['mask'])
+                    aug_X = torch.cat([aug_X, image_tensor.view(1, *list(image_tensor.shape))])
+                    aug_M = torch.cat([aug_M, mask_tensor.view(1, *list(mask_tensor.shape))])
+                    aug_y.append(c)
+        return aug_X, torch.tensor(aug_y).long(), aug_M
