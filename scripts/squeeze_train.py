@@ -16,7 +16,7 @@ from tqdm import tqdm
 from torch import nn, optim
 from torch.utils.data import dataloader
 from torchvision import transforms, models
-from sklearn.metrics import accuracy_score, auc, confusion_matrix, roc_curve, f1_score
+from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score
 from sklearn.utils import shuffle
 
 def get_argparse():
@@ -44,6 +44,8 @@ def get_argparse():
                         type=str,            default='../data/multiData/M_val.pth')
     parser.add_argument('--use_sliding_window',
                         action='store_true')
+    parser.add_argument('--reduce_class_zero',
+                        type=float,          default=0.50)
     parser.add_argument('--use_augmentation',
                         action='store_true')
     parser.add_argument('--cpu',
@@ -66,12 +68,17 @@ def get_argparse():
                         action='store_true')
     parser.add_argument('--save_last',
                         action='store_true')
+    parser.add_argument('--vanilla',
+                        action='store_true')
 
     args = parser.parse_args()
     return args
 
 def get_model(args, device):
-    net = models.squeezenet1_1(pretrained=True)
+    if not args.vanilla:
+        net = models.squeezenet1_1(pretrained=True)
+    else:
+        net = models.squeezenet1_1(pretrained=False)
     if args.reduced > 0:
         filters = {10: 384, 9:256, 8:256, 7:256}
         net.features = net.features[:args.reduced]
@@ -81,7 +88,7 @@ def get_model(args, device):
                                       stride = (1, 1))
 
     net.classifier = nn.Sequential(*net.classifier, nn.Flatten(),
-                                   nn.Linear(1000, args.n_output))
+                                    nn.Linear(1000, args.n_output))
     print(net)
     net = net.to(device)
     return net
@@ -103,6 +110,10 @@ def sliding_window(X, y, M, batch_size):
     X_slided = X_slided[mean > -1.80]
     y_slided = y_slided[mean > -1.80]
     M_slided = M_slided[mean > -1.80]
+    """
+    if args.reduce_class_zero != 0:
+        X_slided_0_
+    """
     return X_slided, y_slided, M_slided
 
 def use_noise(X, y, noise_coeff, device):
@@ -187,6 +198,7 @@ def main():
     train_loss_curve, valid_loss_curve = [], []
     train_accuracy, valid_accuracy = [], []
     train_f1, valid_f1 = [], []
+    train_bal_accuracy, valid_bal_accuracy = [], []
 
     best_loss = np.inf
     patience = 0
@@ -198,6 +210,7 @@ def main():
         batch_train_loss, batch_valid_loss = [], []
         batch_train_acc, batch_valid_acc = [], []
         batch_train_f1, batch_valid_f1 = [], []
+        batch_train_bal_acc, batch_valid_bal_acc = [], []
         time.sleep(0.1)
 
         ### TRAIN
@@ -216,7 +229,8 @@ def main():
             y_true = y.cpu().numpy()
             batch_train_loss.append(float(loss))
             batch_train_acc.append(float(accuracy_score(y_true, y_pred)))
-            batch_train_f1.append(float(f1_score(y_true, y_pred, average='macro')))
+            batch_train_bal_acc.append(float(balanced_accuracy_score(y_true, y_pred)))
+            batch_train_f1.append(float(f1_score(y_true, y_pred, average='weighted')))
 
         ### VALIDATION
         time.sleep(0.1)
@@ -230,6 +244,7 @@ def main():
                 y_pred = np.argmax(out.detach().cpu().numpy(), axis=1)
                 batch_valid_loss.append(float(loss))
                 batch_valid_acc.append(float(accuracy_score(y.cpu().numpy(), y_pred)))
+                batch_valid_bal_acc.append(float(balanced_accuracy_score(y.cpu().numpy(), y_pred)))
                 batch_valid_f1.append(float(f1_score(y.cpu().numpy(), y_pred, average='weighted')))
 
         #lr_scheduler.step()
@@ -237,11 +252,13 @@ def main():
         ### Check results
         train_loss_curve.append(np.mean(batch_train_loss))
         train_accuracy.append(np.mean(batch_train_acc))
+        train_bal_accuracy.append(np.mean(batch_train_bal_acc))
         train_f1.append(np.mean(batch_train_f1))
 
         valid_loss_curve.append(np.mean(batch_valid_loss))
         valid_accuracy.append(np.mean(batch_valid_acc))
         valid_f1.append(np.mean(batch_valid_f1))
+        valid_bal_accuracy.append(np.mean(batch_valid_bal_acc))
 
         if valid_loss_curve[-1] < best_loss:
             best_loss = valid_loss_curve[-1]
@@ -252,10 +269,10 @@ def main():
             patience += 1
             time.sleep(0.1)
         print('Epoch: {}'.format(ep + 1))
-        print('Train:\tCrossEntropyLoss: {:.5f}\tAccuracy: {:.4f}'.format(train_loss_curve[-1], train_accuracy[-1]), end = '\t')
-        print('F1 Score:\t{:.4f}'.format(train_f1[-1]))
-        print('Valid:\tCrossEntropyLoss: {:.5f}\tAccuracy: {:.4f}'.format(valid_loss_curve[-1], valid_accuracy[-1]), end = '\t')
-        print('F1 Score:\t{:.4f}'.format(valid_f1[-1]))
+        print('Train:\tCrossEntropyLoss: {:.4f}\tAccuracy: {:.4f}'.format(train_loss_curve[-1], train_accuracy[-1]), end = '\t')
+        print('F1 Score: {:.4f}\tBalanced Accuracy:\t{:.4f}'.format(train_f1[-1], train_bal_accuracy[-1]))
+        print('Valid:\tCrossEntropyLoss: {:.4f}\tAccuracy: {:.4f}'.format(valid_loss_curve[-1], valid_accuracy[-1]), end = '\t')
+        print('F1 Score: {:.4f}\tBalanced Accuracy:\t{:.4f}'.format(valid_f1[-1], valid_bal_accuracy[-1]))
         time.sleep(0.1)
 
         if patience >= max_patience:
