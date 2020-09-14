@@ -24,7 +24,7 @@ The structure of the repo is the following: <br>
 
 ### 2. Binary Model
 #### 2.a) Model used
-Three model have been used to solve this task: VGG16_bn, Squeeze Net 1.1 and an ad-hoc CNN. 
+Three models have been used to solve this task: VGG16_bn, Squeeze Net 1.1 and an ad-hoc CNN. 
 #### 2.b) Model evaluation
 The final model is a reduced version of the pre-trained Squeeze Net 1.1, fine tuned on our dataset and uagmented using gaussian noise. It reaches 0.941 acccuracy, 0.944 f1-score and an AUC of 0.983 on the test set. This metrics where around 0.18 points greater than a baseline model (Logistic Regression).
 #### 2.c) Inspection and interpetability techniques
