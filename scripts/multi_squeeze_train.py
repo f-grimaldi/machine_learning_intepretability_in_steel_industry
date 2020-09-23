@@ -1,8 +1,10 @@
 import sys
 import os
 sys.path.append('\\'.join(os.getcwd().split('\\')[:-1])+'\\src')
+import models as c_models
 from dataset import SlidingWindow
 from utils import get_default_params
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,6 +25,7 @@ def get_argparse():
     # 1. Set argument
     parser = argparse.ArgumentParser(description='Explain SteelNetClassifier')
     # 1.a) General args
+    parser.add_argument('--model',             type=str)
     parser.add_argument('--model_output_path', type=str)
     parser.add_argument('--train_input_path',
                         type=str,            default='../data/multiData/X_train.pth')
@@ -75,23 +78,14 @@ def get_argparse():
     return args
 
 def get_model(args, device):
-    if not args.vanilla:
-        net = models.squeezenet1_1(pretrained=True)
+    if args.model == 'squeeze':
+        return c_models.get_squeeze(args, device)
+    elif args.model == 'vgg':
+        return c_models.get_vgg(args, device)
+    elif args.model == 'custom':
+        return  c_models.get_cnn(args, device)
     else:
-        net = models.squeezenet1_1(pretrained=False)
-    if args.reduced > 0:
-        filters = {10: 384, 9:256, 8:256, 7:256}
-        net.features = net.features[:args.reduced]
-        net.classifier[1] = nn.Conv2d(filters[args.reduced],
-                                      1000,
-                                      kernel_size = (1, 1),
-                                      stride = (1, 1))
-
-    net.classifier = nn.Sequential(*net.classifier, nn.Flatten(),
-                                    nn.Linear(1000, args.n_output))
-    print(net)
-    net = net.to(device)
-    return net
+        raise NotImplementedError
 
 def sliding_window(X, y, M, batch_size):
     sliding = SlidingWindow(X, y, M)

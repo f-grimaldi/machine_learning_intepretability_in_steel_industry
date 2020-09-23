@@ -149,6 +149,7 @@ data/multiData/*
 !data/binaryData/train_data.csv
 !data/binaryData/val_data.csv
 !data/binaryData/test_data.csv
+!data/binaryData/white_mask.pth
 !data/multiData/multi_task_data.csv
 !data/multiData/train_data.csv
 !data/multiData/val_data.csv

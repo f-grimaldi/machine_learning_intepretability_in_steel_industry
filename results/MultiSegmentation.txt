@@ -1,0 +1,24 @@
+			Accuracy	Recall	Precision	Dice	IoU	Time(it/s)
+DeepLift(3std+blur)	0.		0.571	0.136		0.177	0.105	9.18
+DeepLift(bb5,3+b)	0.		0.760	0.257		0.316	0.204	7.47
+DeepShap(3+b)		0.		0.541	0.225		0.243	0.150	1.87
+GradCam(3+b)		0.		0.499	0.223		0.236	0.144	44.46
+GuidedGradCam(3+b)	0.		0.576	0.360		0.363	0.236	15.59
+GuidedBackProp(3+b)	0.		0.638	0.285		0.315	0.199	22.49
+IntegratedGrad(bb5,3+b)	0.		0.714	0.075		0.115	0.066	3.80
+IntegratedGrad(3+b)	0.		0.660	0.068		0.105	0.060	3.91
+LIME			0.		0.257	0.127		0.071	0.041	1.56
+	
+GuidedBackProp(2+b)	0.		0.755	0.213		0.271	0.169	22.49
+GuidedGradCam(2+b)	0.		0.666	0.296		0.340	0.220	15.59
+GradCam(2+b)		0.		0.750	0.167		0.236	0.147	44.46
+
+
+			Recall	Precision	Dice	IoU	Time(it/s)
+DeepLift		0.760	0.257		0.316	0.204	7.47
+DeepShap		0.541	0.225		0.243	0.150	1.87
+GradCam			0.499	0.223		0.236	0.144	44.46
+GuidedGradCam		0.576	0.360		0.363	0.236	15.59
+GuidedBackProp		0.638	0.285		0.315	0.199	22.49
+IntegratedGrad		0.714	0.075		0.115	0.066	3.80
+LIME			0.257	0.127		0.071	0.041	1.56

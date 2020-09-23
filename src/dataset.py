@@ -46,7 +46,7 @@ class Resize(object):
     def __call__(self, img):
         return cv2.resize(img, self.size)
 
-class SteelDataset(object):
+class SteelDataset(torch.utils.data.Dataset):
     def __init__(self,
                  metadata_root,
                  image_root,
@@ -118,7 +118,8 @@ class SteelDataset(object):
         # 2.a) Extract label
         target['label'] = self.get_class(idx)
         # 2.b) Extract segmentation
-        target['mask'] = self.get_mask(idx)
+        target['mask'] = torch.tensor(self.get_mask(idx))
+
         #print(target['mask'].max())
         ### 3. Transform
         if self.transform:
