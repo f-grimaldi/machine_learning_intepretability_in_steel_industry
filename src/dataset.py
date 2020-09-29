@@ -53,12 +53,16 @@ class SteelDataset(torch.utils.data.Dataset):
                  shape=(256, 1600, 3),
                  colors=None,
                  transform=None,
-                 mask_transform = None):
+                 mask_transform = None,
+                 sample_df=True):
 
         self.metadata_root = metadata_root
         self.image_root = image_root
         self.shape = shape
-        self.metadata = pd.read_csv(self.metadata_root).sample(frac=1).reset_index(drop=True)
+        if sample_df == True:
+            self.metadata = pd.read_csv(self.metadata_root).sample(frac=1).reset_index(drop=True)
+        else:
+            self.metadata = pd.read_csv(self.metadata_root)
         self.transform = transform
         self.mask_transform = mask_transform
         self.init_colors(colors)
@@ -118,7 +122,7 @@ class SteelDataset(torch.utils.data.Dataset):
         # 2.a) Extract label
         target['label'] = self.get_class(idx)
         # 2.b) Extract segmentation
-        target['mask'] = torch.tensor(self.get_mask(idx))
+        target['mask'] = self.get_mask(idx)
 
         #print(target['mask'].max())
         ### 3. Transform
@@ -126,7 +130,7 @@ class SteelDataset(torch.utils.data.Dataset):
             img = self.transform(img)
         if self.mask_transform:
             #print('Here')
-            target['mask'] = self.mask_transform(target['mask'])
+            target['mask'] = torch.tensor(self.mask_transform(target['mask']))
 
         return img, target
 
